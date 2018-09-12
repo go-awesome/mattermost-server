@@ -15,6 +15,7 @@ import (
 )
 
 const (
+	VERSION_5_5_0            = "5.5.0"
 	VERSION_5_4_0            = "5.4.0"
 	VERSION_5_3_0            = "5.3.0"
 	VERSION_5_2_0            = "5.2.0"
@@ -86,6 +87,7 @@ func UpgradeDatabase(sqlStore SqlStore) {
 	UpgradeDatabaseToVersion52(sqlStore)
 	UpgradeDatabaseToVersion53(sqlStore)
 	UpgradeDatabaseToVersion54(sqlStore)
+	UpgradeDatabaseToVersion55(sqlStore)
 
 	// If the SchemaVersion is empty this this is the first time it has ran
 	// so lets set it to the current version.
@@ -503,4 +505,16 @@ func UpgradeDatabaseToVersion54(sqlStore SqlStore) {
 		os.Exit(EXIT_GENERIC_FAILURE)
 	}
 	// 	saveSchemaVersion(sqlStore, VERSION_5_4_0)
+}
+
+func UpgradeDatabaseToVersion55(sqlStore SqlStore) {
+	// if shouldPerformUpgrade(sqlStore, VERSION_5_4_0, VERSION_5_5_0) {
+	membershipColName := "MembershipUpdatedFromGroup"
+	schemeColName := "SchemeUpdatedFromGroup"
+	sqlStore.CreateColumnIfNotExistsNoDefault("TeamMembers", membershipColName, "boolean", "boolean")
+	sqlStore.CreateColumnIfNotExistsNoDefault("TeamMembers", schemeColName, "boolean", "boolean")
+	sqlStore.CreateColumnIfNotExistsNoDefault("ChannelMembers", schemeColName, "boolean", "boolean")
+	sqlStore.CreateColumnIfNotExistsNoDefault("ChannelMemberHistory", membershipColName, "boolean", "boolean")
+	// saveSchemaVersion(sqlStore, VERSION_5_5_0)
+	// }
 }

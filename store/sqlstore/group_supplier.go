@@ -15,6 +15,7 @@ import (
 
 func initSqlSupplierGroups(sqlStore SqlStore) {
 	kibibyte := 1024
+
 	for _, db := range sqlStore.GetAllConns() {
 		groups := db.AddTableWithName(model.Group{}, "Groups").SetKeys(false, "Id")
 		groups.ColMap("Id").SetMaxSize(26)
@@ -27,6 +28,8 @@ func initSqlSupplierGroups(sqlStore SqlStore) {
 		groupMembers := db.AddTableWithName(model.GroupMember{}, "GroupMembers").SetKeys(false, "GroupId", "UserId")
 		groupMembers.ColMap("GroupId").SetMaxSize(26)
 		groupMembers.ColMap("UserId").SetMaxSize(26)
+		groupMembers.AddIndex("idx_group_members_create_at", "btree", []string{"CreateAt"})
+		groupMembers.AddIndex("idx_group_members_delete_at", "btree", []string{"DeleteAt"})
 
 		groupTeams := db.AddTableWithName(model.GroupTeam{}, "GroupTeams").SetKeys(false, "GroupId", "TeamId")
 		groupTeams.ColMap("GroupId").SetMaxSize(26)

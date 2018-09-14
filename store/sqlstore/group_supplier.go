@@ -13,27 +13,25 @@ import (
 	"github.com/mattermost/mattermost-server/store"
 )
 
-func initSqlSupplierGroups(sqlStore SqlStore) {
-	kibibyte := 1024
+type groupMembers []model.GroupMember
 
+func initSqlSupplierGroups(sqlStore SqlStore) {
 	for _, db := range sqlStore.GetAllConns() {
 		groups := db.AddTableWithName(model.Group{}, "Groups").SetKeys(false, "Id")
 		groups.ColMap("Id").SetMaxSize(26)
-		groups.ColMap("Name").SetMaxSize(64).SetUnique(true)
-		groups.ColMap("DisplayName").SetMaxSize(128)
-		groups.ColMap("Description").SetMaxSize(kibibyte)
-		groups.ColMap("Type").SetMaxSize(64)
-		groups.ColMap("TypeProps").SetMaxSize(64 * kibibyte)
+		groups.ColMap("Name").SetMaxSize(model.GroupNameMaxLength).SetUnique(true)
+		groups.ColMap("DisplayName").SetMaxSize(model.GroupDisplayNameMaxLength)
+		groups.ColMap("Description").SetMaxSize(model.GroupDescriptionMaxLength)
+		groups.ColMap("Type").SetMaxSize(model.GroupTypeMaxLength)
+		groups.ColMap("TypeProps").SetMaxSize(model.GroupTypePropsMaxLength)
 
 		groupMembers := db.AddTableWithName(model.GroupMember{}, "GroupMembers").SetKeys(false, "GroupId", "UserId")
 		groupMembers.ColMap("GroupId").SetMaxSize(26)
 		groupMembers.ColMap("UserId").SetMaxSize(26)
-		groupMembers.AddIndex("idx_group_members_create_at", "btree", []string{"CreateAt"})
-		groupMembers.AddIndex("idx_group_members_delete_at", "btree", []string{"DeleteAt"})
 
-		groupTeams := db.AddTableWithName(model.GroupTeam{}, "GroupTeams").SetKeys(false, "GroupId", "TeamId")
+		groupTeams := db.AddTableWithName(model.GroupTeam{}, "GroupTeams").SetKeys(false, "GroupId", "GroupId")
 		groupTeams.ColMap("GroupId").SetMaxSize(26)
-		groupTeams.ColMap("TeamId").SetMaxSize(26)
+		groupTeams.ColMap("GroupId").SetMaxSize(26)
 
 		groupChannels := db.AddTableWithName(model.GroupChannel{}, "GroupChannels").SetKeys(false, "GroupId", "ChannelId")
 		groupChannels.ColMap("GroupId").SetMaxSize(26)
@@ -43,16 +41,15 @@ func initSqlSupplierGroups(sqlStore SqlStore) {
 
 func (s *SqlSupplier) GroupSave(ctx context.Context, group *model.Group, hints ...store.LayeredStoreHint) *store.LayeredStoreSupplierResult {
 	result := store.NewSupplierResult()
-	validationErr := model.NewAppError("SqlGroupStore.GroupSave", "store.sql_group.save.invalid_group.app_error", nil, "", http.StatusBadRequest)
+	var err error
 
 	if len(group.Id) == 0 {
-		if !group.IsValidForCreate() {
-			result.Err = validationErr
+		if err := group.IsValidForCreate(); err != nil {
+			result.Err = err
 			return result
 		}
 
 		var transaction *gorp.Transaction
-		var err error
 
 		if transaction, err = s.GetMaster().Begin(); err != nil {
 			result.Err = model.NewAppError("SqlGroupStore.GroupSave", "store.sql_group.save.open_transaction.app_error", nil, err.Error(), http.StatusInternalServerError)
@@ -67,8 +64,8 @@ func (s *SqlSupplier) GroupSave(ctx context.Context, group *model.Group, hints .
 			result.Err = model.NewAppError("SqlGroupStore.GroupSave", "store.sql_group.save_group.commit_transaction.app_error", nil, err.Error(), http.StatusInternalServerError)
 		}
 	} else {
-		if !group.IsValidForUpdate() {
-			result.Err = validationErr
+		if err := group.IsValidForUpdate(); err != nil {
+			result.Err = err
 			return result
 		}
 
@@ -89,8 +86,8 @@ func (s *SqlSupplier) GroupSave(ctx context.Context, group *model.Group, hints .
 func (s *SqlSupplier) createGroup(ctx context.Context, group *model.Group, transaction *gorp.Transaction, hints ...store.LayeredStoreHint) *store.LayeredStoreSupplierResult {
 	result := store.NewSupplierResult()
 
-	if !group.IsValidForCreate() {
-		result.Err = model.NewAppError("SqlGroupStore.GroupSave", "store.sql_group.save.invalid_group.app_error", nil, "", http.StatusBadRequest)
+	if err := group.IsValidForCreate(); err != nil {
+		result.Err = err
 		return result
 	}
 
@@ -125,20 +122,16 @@ func (s *SqlSupplier) GroupGet(ctx context.Context, groupId string, hints ...sto
 	return result
 }
 
-func (s *SqlSupplier) GroupGetByName(ctx context.Context, name string, hints ...store.LayeredStoreHint) *store.LayeredStoreSupplierResult {
+func (s *SqlSupplier) GroupGetAllPage(ctx context.Context, offset int, limit int, hints ...store.LayeredStoreHint) *store.LayeredStoreSupplierResult {
 	result := store.NewSupplierResult()
 
-	var group model.Group
+	var groups []*model.Group
 
-	if err := s.GetReplica().SelectOne(&group, "SELECT * from Groups WHERE Name = :Name", map[string]interface{}{"Name": name}); err != nil {
-		if err == sql.ErrNoRows {
-			result.Err = model.NewAppError("SqlGroupStore.GetByName", "store.sql_group.get_by_name.app_error", nil, "name="+name+",err="+err.Error(), http.StatusNotFound)
-		} else {
-			result.Err = model.NewAppError("SqlGroupStore.GetByName", "store.sql_group.get_by_name.app_error", nil, "name="+name+",err="+err.Error(), http.StatusInternalServerError)
-		}
+	if _, err := s.GetReplica().Select(&groups, "SELECT * from Groups WHERE DeleteAt = 0 ORDER BY CreateAt DESC LIMIT :Limit OFFSET :Offset", map[string]interface{}{"Limit": limit, "Offset": offset}); err != nil {
+		result.Err = model.NewAppError("SqlGroupStore.Get", "store.sql_group.get.app_error", nil, err.Error(), http.StatusInternalServerError)
 	}
 
-	result.Data = group
+	result.Data = groups
 
 	return result
 }
@@ -171,3 +164,97 @@ func (s *SqlSupplier) GroupDelete(ctx context.Context, groupId string, hints ...
 
 	return result
 }
+
+func (s *SqlSupplier) GroupAddMember(member *model.GroupMember) store.StoreChannel {
+	return store.Do(func(result *store.StoreResult) {
+		if result.Err = member.IsValid(); result.Err != nil {
+			return
+		}
+
+		if err := s.GetMaster().Insert(member); err != nil {
+			if IsUniqueConstraintError(err, []string{"GroupId", "groupmembers_pkey", "PRIMARY"}) {
+				result.Err = model.NewAppError("SqlGroupStore.SaveMember", "store.sql_group.save_member.exists.app_error", nil, "group_id="+member.GroupId+", user_id="+member.UserId+", "+err.Error(), http.StatusBadRequest)
+				return
+			}
+			result.Err = model.NewAppError("SqlGroupStore.SaveMember", "store.sql_group.save_member.save.app_error", nil, "group_id="+member.GroupId+", user_id="+member.UserId+", "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		var retrievedMember *model.GroupMember
+		if err := s.GetMaster().SelectOne(&retrievedMember, "SELECT * FROM GroupMembers WHERE GroupId = :GroupId AND UserId = :UserId", map[string]interface{}{"GroupId": member.GroupId, "UserId": member.UserId}); err != nil {
+			if err == sql.ErrNoRows {
+				result.Err = model.NewAppError("SqlGroupStore.SaveMember", "store.sql_group.get_member.missing.app_error", nil, "group_id="+member.GroupId+"user_id="+member.UserId+","+err.Error(), http.StatusNotFound)
+				return
+			}
+			result.Err = model.NewAppError("SqlGroupStore.SaveMember", "store.sql_group.get_member.app_error", nil, "group_id="+member.GroupId+"user_id="+member.UserId+","+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		result.Data = retrievedMember
+	})
+}
+
+// // TODO: set the DeleteAt field
+// func (s *SqlSupplier) GroupRemoveMember(teamId string, userId string) store.StoreChannel {
+// 	return store.Do(func(result *store.StoreResult) {
+// 		_, err := s.GetMaster().Exec("DELETE FROM GroupMembers WHERE GroupId = :GroupId AND UserId = :UserId", map[string]interface{}{"GroupId": teamId, "UserId": userId})
+// 		if err != nil {
+// 			result.Err = model.NewAppError("SqlChannelStore.RemoveMember", "store.sql_group.remove_member.app_error", nil, "group_id="+teamId+", user_id="+userId+", "+err.Error(), http.StatusInternalServerError)
+// 		}
+// 	})
+// }
+
+// func (s SqlGroupStore) UpdateMember(member *model.GroupMember) store.StoreChannel {
+// 	return store.Do(func(result *store.StoreResult) {
+// 		member.PreUpdate()
+
+// 		if result.Err = member.IsValid(); result.Err != nil {
+// 			return
+// 		}
+
+// 		if _, err := s.GetMaster().Update(NewTeamMemberFromModel(member)); err != nil {
+// 			result.Err = model.NewAppError("SqlGroupStore.UpdateMember", "store.sql_group.save_member.save.app_error", nil, err.Error(), http.StatusInternalServerError)
+// 			return
+// 		}
+
+// 		var retrievedMember groupMembers
+// 		if err := s.GetMaster().SelectOne(&retrievedMember, TEAM_MEMBERS_WITH_SCHEME_SELECT_QUERY+"WHERE GroupMembers.GroupId = :GroupId AND GroupMembers.UserId = :UserId", map[string]interface{}{"GroupId": member.GroupId, "UserId": member.UserId}); err != nil {
+// 			if err == sql.ErrNoRows {
+// 				result.Err = model.NewAppError("SqlGroupStore.UpdateMember", "store.sql_group.get_member.missing.app_error", nil, "group_id="+member.GroupId+"user_id="+member.UserId+","+err.Error(), http.StatusNotFound)
+// 				return
+// 			}
+// 			result.Err = model.NewAppError("SqlGroupStore.UpdateMember", "store.sql_group.get_member.app_error", nil, "group_id="+member.GroupId+"user_id="+member.UserId+","+err.Error(), http.StatusInternalServerError)
+// 			return
+// 		}
+
+// 		result.Data = retrievedMember.ToModel()
+// 	})
+// }
+
+// func (s *SqlSupplier) GroupGetMember(teamId string, userId string) store.StoreChannel {
+// 	return store.Do(func(result *store.StoreResult) {
+// 		var dbMember groupMembers
+// 		err := s.GetReplica().SelectOne(&dbMember, TEAM_MEMBERS_WITH_SCHEME_SELECT_QUERY+"WHERE GroupMembers.GroupId = :GroupId AND GroupMembers.UserId = :UserId", map[string]interface{}{"GroupId": teamId, "UserId": userId})
+// 		if err != nil {
+// 			if err == sql.ErrNoRows {
+// 				result.Err = model.NewAppError("SqlGroupStore.GetMember", "store.sql_group.get_member.missing.app_error", nil, "teamId="+teamId+" userId="+userId+" "+err.Error(), http.StatusNotFound)
+// 				return
+// 			}
+// 			result.Err = model.NewAppError("SqlGroupStore.GetMember", "store.sql_group.get_member.app_error", nil, "teamId="+teamId+" userId="+userId+" "+err.Error(), http.StatusInternalServerError)
+// 			return
+// 		}
+// 		result.Data = dbMember.ToModel()
+// 	})
+// }
+
+// func (s *SqlSupplier) GroupGetMembers(teamId string, offset int, limit int) store.StoreChannel {
+// 	return store.Do(func(result *store.StoreResult) {
+// 		var dbMembers teamMemberWithSchemeRolesList
+// 		_, err := s.GetReplica().Select(&dbMembers, TEAM_MEMBERS_WITH_SCHEME_SELECT_QUERY+"WHERE GroupMembers.GroupId = :GroupId AND GroupMembers.DeleteAt = 0 LIMIT :Limit OFFSET :Offset", map[string]interface{}{"GroupId": teamId, "Limit": limit, "Offset": offset})
+// 		if err != nil {
+// 			result.Err = model.NewAppError("SqlGroupStore.GetMembers", "store.sql_group.get_members.app_error", nil, "teamId="+teamId+" "+err.Error(), http.StatusInternalServerError)
+// 			return
+// 		}
+
+// 		result.Data = dbMembers.ToModel()
+// 	})
+// }

@@ -29,6 +29,7 @@ type LayeredStore struct {
 	LocalCacheLayer *LocalCacheSupplier
 	RedisLayer      *RedisSupplier
 	LayerChainHead  LayeredStoreSupplier
+	GroupStore      GroupStore
 }
 
 func NewLayeredStore(db LayeredStoreDatabaseLayer, metrics einterfaces.MetricsInterface, cluster einterfaces.ClusterInterface) Store {
@@ -41,6 +42,7 @@ func NewLayeredStore(db LayeredStoreDatabaseLayer, metrics einterfaces.MetricsIn
 	store.ReactionStore = &LayeredReactionStore{store}
 	store.RoleStore = &LayeredRoleStore{store}
 	store.SchemeStore = &LayeredSchemeStore{store}
+	store.GroupStore = &LayeredGroupStore{store}
 
 	// Setup the chain
 	if ENABLE_EXPERIMENTAL_REDIS {
@@ -171,6 +173,10 @@ func (s *LayeredStore) Role() RoleStore {
 
 func (s *LayeredStore) Scheme() SchemeStore {
 	return s.SchemeStore
+}
+
+func (s *LayeredStore) Group() GroupStore {
+	return s.GroupStore
 }
 
 func (s *LayeredStore) MarkSystemRanUnitTests() {
@@ -316,5 +322,33 @@ func (s *LayeredSchemeStore) GetAllPage(scope string, offset int, limit int) Sto
 func (s *LayeredSchemeStore) PermanentDeleteAll() StoreChannel {
 	return s.RunQuery(func(supplier LayeredStoreSupplier) *LayeredStoreSupplierResult {
 		return supplier.SchemePermanentDeleteAll(s.TmpContext)
+	})
+}
+
+type LayeredGroupStore struct {
+	*LayeredStore
+}
+
+func (s *LayeredGroupStore) Save(group *model.Group) StoreChannel {
+	return s.RunQuery(func(supplier LayeredStoreSupplier) *LayeredStoreSupplierResult {
+		return supplier.GroupSave(s.TmpContext, group)
+	})
+}
+
+func (s *LayeredGroupStore) Get(groupId string) StoreChannel {
+	return s.RunQuery(func(supplier LayeredStoreSupplier) *LayeredStoreSupplierResult {
+		return supplier.GroupGet(s.TmpContext, groupId)
+	})
+}
+
+func (s *LayeredGroupStore) GetAllPage(offset int, limit int) StoreChannel {
+	return s.RunQuery(func(supplier LayeredStoreSupplier) *LayeredStoreSupplierResult {
+		return supplier.GroupGetAllPage(s.TmpContext, offset, limit)
+	})
+}
+
+func (s *LayeredGroupStore) Delete(groupId string) StoreChannel {
+	return s.RunQuery(func(supplier LayeredStoreSupplier) *LayeredStoreSupplierResult {
+		return supplier.GroupDelete(s.TmpContext, groupId)
 	})
 }

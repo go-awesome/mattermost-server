@@ -92,6 +92,7 @@ type SqlSupplierOldStores struct {
 	channelMemberHistory store.ChannelMemberHistoryStore
 	role                 store.RoleStore
 	scheme               store.SchemeStore
+	group                store.GroupStore
 }
 
 type SqlSupplier struct {
@@ -973,6 +974,10 @@ func (ss *SqlSupplier) Role() store.RoleStore {
 
 func (ss *SqlSupplier) Scheme() store.SchemeStore {
 	return ss.oldStores.scheme
+}
+
+func (ss *SqlSupplier) Group() store.GroupStore {
+	return ss.oldStores.group
 }
 
 func (ss *SqlSupplier) DropAllTables() {

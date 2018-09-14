@@ -29,9 +29,9 @@ func initSqlSupplierGroups(sqlStore SqlStore) {
 		groupMembers.ColMap("GroupId").SetMaxSize(26)
 		groupMembers.ColMap("UserId").SetMaxSize(26)
 
-		groupTeams := db.AddTableWithName(model.GroupTeam{}, "GroupTeams").SetKeys(false, "GroupId", "GroupId")
+		groupTeams := db.AddTableWithName(model.GroupTeam{}, "GroupTeams").SetKeys(false, "GroupId", "TeamId")
 		groupTeams.ColMap("GroupId").SetMaxSize(26)
-		groupTeams.ColMap("GroupId").SetMaxSize(26)
+		groupTeams.ColMap("TeamId").SetMaxSize(26)
 
 		groupChannels := db.AddTableWithName(model.GroupChannel{}, "GroupChannels").SetKeys(false, "GroupId", "ChannelId")
 		groupChannels.ColMap("GroupId").SetMaxSize(26)

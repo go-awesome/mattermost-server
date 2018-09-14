@@ -57,16 +57,8 @@ func (group *Group) IsValidForCreate() *AppError {
 		return NewAppError("Group.IsValidForCreate", "model.group.type.app_error", map[string]interface{}{"ValidGroupTypes": strings.Join(groupTypes, ", ")}, "", http.StatusBadRequest)
 	}
 
-	if len(group.TypeProps) > GroupTypeMaxLength {
-		return NewAppError("Group.IsValidForCreate", "model.group.type_props.app_error", map[string]interface{}{"GroupTypeMaxLength": GroupTypeMaxLength}, "", http.StatusBadRequest)
-	}
-
-	if group.CreateAt == 0 {
-		return NewAppError("Group.IsValidForCreate", "model.group.create_at.app_error", nil, "", http.StatusBadRequest)
-	}
-
-	if group.UpdateAt == 0 {
-		return NewAppError("Group.IsValidForCreate", "model.group.update_at.app_error", nil, "", http.StatusBadRequest)
+	if len(group.TypeProps) > GroupTypePropsMaxLength {
+		return NewAppError("Group.IsValidForCreate", "model.group.type_props.app_error", map[string]interface{}{"GroupTypePropsMaxLength": GroupTypePropsMaxLength}, "", http.StatusBadRequest)
 	}
 
 	return nil
@@ -75,6 +67,13 @@ func (group *Group) IsValidForCreate() *AppError {
 func (group *Group) IsValidForUpdate() *AppError {
 	if len(group.Id) != 26 {
 		return NewAppError("Group.IsValidForUpdate", "model.group.id.app_error", nil, "", http.StatusBadRequest)
+	}
+	if group.CreateAt == 0 {
+		return NewAppError("Group.IsValidForCreate", "model.group.create_at.app_error", nil, "", http.StatusBadRequest)
+	}
+
+	if group.UpdateAt == 0 {
+		return NewAppError("Group.IsValidForCreate", "model.group.update_at.app_error", nil, "", http.StatusBadRequest)
 	}
 	if err := group.IsValidForCreate(); err != nil {
 		return err

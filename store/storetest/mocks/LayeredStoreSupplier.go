@@ -14,6 +14,98 @@ type LayeredStoreSupplier struct {
 	mock.Mock
 }
 
+// GroupDelete provides a mock function with given fields: ctx, groupId, hints
+func (_m *LayeredStoreSupplier) GroupDelete(ctx context.Context, groupId string, hints ...store.LayeredStoreHint) *store.LayeredStoreSupplierResult {
+	_va := make([]interface{}, len(hints))
+	for _i := range hints {
+		_va[_i] = hints[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, groupId)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *store.LayeredStoreSupplierResult
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...store.LayeredStoreHint) *store.LayeredStoreSupplierResult); ok {
+		r0 = rf(ctx, groupId, hints...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*store.LayeredStoreSupplierResult)
+		}
+	}
+
+	return r0
+}
+
+// GroupGet provides a mock function with given fields: ctx, groupId, hints
+func (_m *LayeredStoreSupplier) GroupGet(ctx context.Context, groupId string, hints ...store.LayeredStoreHint) *store.LayeredStoreSupplierResult {
+	_va := make([]interface{}, len(hints))
+	for _i := range hints {
+		_va[_i] = hints[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, groupId)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *store.LayeredStoreSupplierResult
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...store.LayeredStoreHint) *store.LayeredStoreSupplierResult); ok {
+		r0 = rf(ctx, groupId, hints...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*store.LayeredStoreSupplierResult)
+		}
+	}
+
+	return r0
+}
+
+// GroupGetAllPage provides a mock function with given fields: ctx, offset, limit, hints
+func (_m *LayeredStoreSupplier) GroupGetAllPage(ctx context.Context, offset int, limit int, hints ...store.LayeredStoreHint) *store.LayeredStoreSupplierResult {
+	_va := make([]interface{}, len(hints))
+	for _i := range hints {
+		_va[_i] = hints[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, offset, limit)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *store.LayeredStoreSupplierResult
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, ...store.LayeredStoreHint) *store.LayeredStoreSupplierResult); ok {
+		r0 = rf(ctx, offset, limit, hints...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*store.LayeredStoreSupplierResult)
+		}
+	}
+
+	return r0
+}
+
+// GroupSave provides a mock function with given fields: ctx, scheme, hints
+func (_m *LayeredStoreSupplier) GroupSave(ctx context.Context, scheme *model.Group, hints ...store.LayeredStoreHint) *store.LayeredStoreSupplierResult {
+	_va := make([]interface{}, len(hints))
+	for _i := range hints {
+		_va[_i] = hints[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, scheme)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *store.LayeredStoreSupplierResult
+	if rf, ok := ret.Get(0).(func(context.Context, *model.Group, ...store.LayeredStoreHint) *store.LayeredStoreSupplierResult); ok {
+		r0 = rf(ctx, scheme, hints...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*store.LayeredStoreSupplierResult)
+		}
+	}
+
+	return r0
+}
+
 // Next provides a mock function with given fields:
 func (_m *LayeredStoreSupplier) Next() store.LayeredStoreSupplier {
 	ret := _m.Called()

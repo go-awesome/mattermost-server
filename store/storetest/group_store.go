@@ -15,7 +15,7 @@ import (
 
 func TestGroupStore(t *testing.T, ss store.Store) {
 	t.Run("Save", func(t *testing.T) { testGroupStoreSave(t, ss) })
-	// t.Run("Get", func(t *testing.T) { testGroupStoreGet(t, ss) })
+	t.Run("Get", func(t *testing.T) { testGroupStoreGet(t, ss) })
 	// t.Run("Delete", func(t *testing.T) { testGroupStoreDelete(t, ss) })
 }
 
@@ -116,40 +116,37 @@ func testGroupStoreSave(t *testing.T, ss store.Store) {
 	assert.NotNil(t, g6.IsValidForCreate())
 }
 
-// func testGroupStoreGet(t *testing.T, ss store.Store) {
-// 	// Save a group to test with.
-// 	g1 := &model.Group{
-// 		Name:        model.NewId(),
-// 		DisplayName: model.NewId(),
-// 		Description: model.NewId(),
-// 		Permissions: []string{
-// 			"invite_user",
-// 			"create_public_channel",
-// 			"add_user_to_team",
-// 		},
-// 		SchemeManaged: false,
-// 	}
+func testGroupStoreGet(t *testing.T, ss store.Store) {
+	// Create a group
+	g1 := &model.Group{
+		Name:        model.NewId(),
+		DisplayName: model.NewId(),
+		Description: model.NewId(),
+		Type:        model.GroupTypeLdap,
+		TypeProps:   model.NewId(),
+	}
+	res1 := <-ss.Group().Save(g1)
+	assert.Nil(t, res1.Err)
+	d1 := res1.Data.(*model.Group)
+	assert.Len(t, d1.Id, 26)
 
-// 	res1 := <-ss.Group().Save(g1)
-// 	assert.Nil(t, res1.Err)
-// 	d1 := res1.Data.(*model.Group)
-// 	assert.Len(t, d1.Id, 26)
+	// Get the group
+	res2 := <-ss.Group().Get(d1.Id)
+	assert.Nil(t, res2.Err)
+	d2 := res2.Data.(*model.Group)
+	assert.Equal(t, d1.Id, d2.Id)
+	assert.Equal(t, d1.Name, d2.Name)
+	assert.Equal(t, d1.DisplayName, d2.DisplayName)
+	assert.Equal(t, d1.Description, d2.Description)
+	assert.Equal(t, d1.TypeProps, d2.TypeProps)
+	assert.Equal(t, d1.CreateAt, d2.CreateAt)
+	assert.Equal(t, d1.UpdateAt, d2.UpdateAt)
+	assert.Equal(t, d1.DeleteAt, d2.DeleteAt)
 
-// 	// Get a valid group
-// 	res2 := <-ss.Group().Get(d1.Id)
-// 	assert.Nil(t, res2.Err)
-// 	d2 := res1.Data.(*model.Group)
-// 	assert.Equal(t, d1.Id, d2.Id)
-// 	assert.Equal(t, g1.Name, d2.Name)
-// 	assert.Equal(t, g1.DisplayName, d2.DisplayName)
-// 	assert.Equal(t, g1.Description, d2.Description)
-// 	assert.Equal(t, g1.Permissions, d2.Permissions)
-// 	assert.Equal(t, g1.SchemeManaged, d2.SchemeManaged)
-
-// 	// Get an invalid group
-// 	res3 := <-ss.Group().Get(model.NewId())
-// 	assert.NotNil(t, res3.Err)
-// }
+	// Get an invalid group
+	res3 := <-ss.Group().Get(model.NewId())
+	assert.NotNil(t, res3.Err)
+}
 
 // func testGroupStoreDelete(t *testing.T, ss store.Store) {
 // 	// Save a group to test with.

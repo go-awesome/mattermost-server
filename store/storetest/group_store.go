@@ -16,6 +16,7 @@ import (
 func TestGroupStore(t *testing.T, ss store.Store) {
 	t.Run("Save", func(t *testing.T) { testGroupStoreSave(t, ss) })
 	t.Run("Get", func(t *testing.T) { testGroupStoreGet(t, ss) })
+	t.Run("GetAllPage", func(t *testing.T) { testGroupStoreGetAllPage(t, ss) })
 	// t.Run("Delete", func(t *testing.T) { testGroupStoreDelete(t, ss) })
 }
 
@@ -146,6 +147,59 @@ func testGroupStoreGet(t *testing.T, ss store.Store) {
 	// Get an invalid group
 	res3 := <-ss.Group().Get(model.NewId())
 	assert.NotNil(t, res3.Err)
+}
+
+func testGroupStoreGetAllPage(t *testing.T, ss store.Store) {
+	numGroups := 10
+
+	groups := []*model.Group{}
+
+	// Create groups
+	for i := 0; i < numGroups; i++ {
+		g := &model.Group{
+			Name:        model.NewId(),
+			DisplayName: model.NewId(),
+			Description: model.NewId(),
+			Type:        model.GroupTypeLdap,
+			TypeProps:   model.NewId(),
+		}
+		groups = append(groups, g)
+		res := <-ss.Group().Save(g)
+		assert.Nil(t, res.Err)
+	}
+
+	// Returns all the groups
+	res1 := <-ss.Group().GetAllPage(0, 999)
+	d1 := res1.Data.([]*model.Group)
+	assert.Condition(t, func() bool { return len(d1) >= numGroups })
+	for _, expectedGroup := range groups {
+		present := false
+		for _, dbGroup := range d1 {
+			if dbGroup.Id == expectedGroup.Id {
+				present = true
+				break
+			}
+		}
+		assert.True(t, present)
+	}
+
+	// Returns the correct number based on limit
+	res2 := <-ss.Group().GetAllPage(0, 2)
+	d2 := res2.Data.([]*model.Group)
+	assert.Len(t, d2, 2)
+
+	// Check that result sets are different using an offset
+	res3 := <-ss.Group().GetAllPage(0, 5)
+	d3 := res3.Data.([]*model.Group)
+	res4 := <-ss.Group().GetAllPage(5, 5)
+	d4 := res4.Data.([]*model.Group)
+	for _, d3i := range d3 {
+		for _, d4i := range d4 {
+			if d4i.Id == d3i.Id {
+				t.Error("Expected results to be unique.")
+			}
+		}
+	}
 }
 
 // func testGroupStoreDelete(t *testing.T, ss store.Store) {
